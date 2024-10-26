@@ -1,5 +1,8 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
+
+import requests
+from bs4 import BeautifulSoup
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -15,7 +18,29 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    return list()
+
+    hyperLinks = [] # hyperlinks on page to return
+    
+    # status_code == 200 if the request is successful
+    if resp.status_code == 200:
+        soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
+
+        # Look at html and look for anchor tags with the href attribute
+        for anchor in soup.find_all('a', href = True):
+            link = anchor['href']
+
+            # Appends the hyperlink portion to the base url link
+            fullLink = urljoin(url, link)
+
+            hyperLinks.append(fullLink)
+    
+    else:
+        print(f"Error: Unable to fetch page.")
+
+        if resp.error:
+            print(f"Error details: {resp.error}")
+
+    return hyperLinks
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
@@ -25,6 +50,20 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+        
+        # Valid domains to crawl
+        allowedDomains = {
+            ".ics.uci.edu",
+            ".cs.uci.edu",
+            ".informatics.uci.edu",
+            ".stat.uci.edu",
+            "today.uci.edu/department/information_computer_sciences",
+        }
+
+        # If the domains above are not in the url, then the url is not valid to crawl
+        if not any(domain in parsed.netloc for domain in allowedDomains):
+            return False
+
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
