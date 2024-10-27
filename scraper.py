@@ -1,7 +1,5 @@
 import re
 from urllib.parse import urlparse, urljoin
-
-import requests
 from bs4 import BeautifulSoup
 
 def scraper(url, resp):
@@ -9,49 +7,44 @@ def scraper(url, resp):
     return [link for link in links if is_valid(link)]
 
 def extract_next_links(url, resp):
-    # Implementation required.
-    # url: the URL that was used to get the page
-    # resp.url: the actual url of the page
-    # resp.status: the status code returned by the server. 200 is OK, you got the page. Other numbers mean that there was some kind of problem.
-    # resp.error: when status is not 200, you can check the error here, if needed.
-    # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
-    #         resp.raw_response.url: the url, again
-    #         resp.raw_response.content: the content of the page!
-    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+    """Extracts hyperlinks from a given URL's response content."""
+    hyperLinks = []  # Store extracted hyperlinks.
 
-    hyperLinks = [] # hyperlinks on page to return
-    
-    # status_code == 200 if the request is successful
-    if resp.status_code == 200:
-        soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
+    try:
+        # Access the status safely.
+        status = getattr(resp, 'status', None) or getattr(resp.raw_response, 'status', None)
 
-        # Look at html and look for anchor tags with the href attribute
-        for anchor in soup.find_all('a', href = True):
-            link = anchor['href']
+        if status == 200:  # If the request is successful.
+            soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
+            print(f"Starting to crawl at: {resp.url}")
 
-            # Appends the hyperlink portion to the base url link
-            fullLink = urljoin(url, link)
+            # Look for all anchor tags with href attributes.
+            for anchor in soup.find_all('a', href=True):
+                link = anchor['href']
+                fullLink = urljoin(url, link)  # Combine base URL with the found link.
+                print(f"Found link: {fullLink}\n")
+                hyperLinks.append(fullLink)
 
-            hyperLinks.append(fullLink)
-    
-    else:
-        print(f"Error: Unable to fetch page.")
+        else:
+            print(f"Error: Unable to fetch page. Status: {status}")
+            if hasattr(resp, 'error') and resp.error:
+                print(f"Error details: {resp.error}")
 
-        if resp.error:
-            print(f"Error details: {resp.error}")
+    except AttributeError as e:
+        print(f"AttributeError: {e} - Please check the response structure.")
+    except Exception as e:
+        print(f"Unexpected error occurred: {e}")
 
     return hyperLinks
 
 def is_valid(url):
-    # Decide whether to crawl this url or not. 
-    # If you decide to crawl it, return True; otherwise return False.
-    # There are already some conditions that return False.
+    """Checks if the URL should be crawled or not."""
     try:
         parsed = urlparse(url)
-        if parsed.scheme not in set(["http", "https"]):
+        if parsed.scheme not in {"http", "https"}:
             return False
-        
-        # Valid domains to crawl
+
+        # Allowed domains for crawling.
         allowedDomains = {
             ".ics.uci.edu",
             ".cs.uci.edu",
@@ -60,10 +53,11 @@ def is_valid(url):
             "today.uci.edu/department/information_computer_sciences",
         }
 
-        # If the domains above are not in the url, then the url is not valid to crawl
+        # Check if the domain is in the allowed list.
         if not any(domain in parsed.netloc for domain in allowedDomains):
             return False
 
+        # Ensure the URL is not pointing to unwanted file types.
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
@@ -74,6 +68,6 @@ def is_valid(url):
             + r"|thmx|mso|arff|rtf|jar|csv"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
 
-    except TypeError:
-        print ("TypeError for ", parsed)
-        raise
+    except TypeError as e:
+        print(f"TypeError for {url}: {e}")
+        return False
