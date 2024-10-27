@@ -32,8 +32,8 @@ def extract_next_links(url, resp):
                     print(f"Found link: {fullLink}")
                     hyperLinks.append(fullLink)
                     visited_urls.add(fullLink)  # Mark as visited.
-                else:
-                    print(f"Skipping duplicate or previously visited URL: {fullLink}")
+                #else:
+                    #print(f"Skipping duplicate or previously visited URL: {fullLink}")
 
         else:
             print(f"Error: Unable to fetch page. Status: {status}")
