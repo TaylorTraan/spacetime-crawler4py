@@ -1,9 +1,21 @@
 import re
 from urllib.parse import urlparse, urljoin, parse_qs
 from bs4 import BeautifulSoup
+import lxml
+from collections import Counter, defaultdict
 
 # A global set to track visited URLs and avoid duplicates.
 visited_urls = set()
+
+# Data structures for analytics
+unique_pages = set()  # Tracks unique pages based on URL (excluding fragments)
+page_lengths = {}     # Tracks page lengths {url: word_count}
+word_counter = Counter()  # Counts words across all pages
+subdomains = defaultdict(int)  # Counts unique pages per subdomain
+
+# Load English stop words
+with open("stop_words.txt") as f:
+    stop_words = set(f.read().split())
 
 def scraper(url, resp):
     """Scrapes the URL and returns a list of valid links."""
@@ -12,28 +24,43 @@ def scraper(url, resp):
 
 def extract_next_links(url, resp):
     """Extracts hyperlinks from a given URL's response content."""
+    global unique_pages
     hyperLinks = []  # Store extracted hyperlinks.
+    
 
     try:
         # Access the status safely.
         status = getattr(resp, 'status', None) or getattr(resp.raw_response, 'status', None)
 
-        if status == 200:  # If the request is successful.
-            soup = BeautifulSoup(resp.raw_response.content, 'html.parser')
-            print(f"Starting to crawl at: {resp.url}")
+        if status == 200 and resp and resp.raw_response:  # If the request is successful.
+            soup = BeautifulSoup(resp.raw_response.content, 'lxml')
+            aTags = soup.findAll('a', href=True) # Find all anchor tags with href attributes.
+            
+            text = soup.get_text()
+            words = re.findall(r'\b\w+\b', text.lower())
+            words = [word for word in words if word not in stop_words]
 
-            # Find all anchor tags with href attributes.
-            for anchor in soup.find_all('a', href=True):
-                link = anchor['href']
-                fullLink = urljoin(url, link)  # Combine base URL with the found link.
+            # Update page length
+            page_lengths[url] = len(words)
+
+            # Update word counter
+            word_counter.update(words)
+
+            # Track subdomains
+            domain = urlparse(url).netloc
+            if domain.endswith('.uci.edu'):
+                subdomains[domain] += 1
+    
+            for anchor in aTags:
+                relativeLink = anchor['href']
+                fullLink = urljoin(url, relativeLink)  # Combine base URL with the found link.
 
                 # Check for duplicate URLs and traps.
-                if fullLink not in visited_urls:
-                    print(f"Found link: {fullLink}")
-                    hyperLinks.append(fullLink)
-                    visited_urls.add(fullLink)  # Mark as visited.
-                #else:
-                    #print(f"Skipping duplicate or previously visited URL: {fullLink}")
+                print(f"Found link: {fullLink}")
+                hyperLinks.append(fullLink)
+                visited_urls.add(fullLink)  # Mark as visited.
+
+            unique_pages.add(url)
 
         else:
             print(f"Error: Unable to fetch page. Status: {status}")
@@ -92,10 +119,6 @@ def is_valid(url):
             parsed.path.lower()):
             return False
 
-        # Avoid overly long URLs (potential traps).
-        if len(url) > 200:
-            print(f"Skipping overly long URL: {url}")
-            return False
 
         return True
 
@@ -103,3 +126,37 @@ def is_valid(url):
         print(f"TypeError for {url}: {e}")
         return False
 
+
+def generate_report():
+    """Generates a report with analytics and saves it to a text file."""
+    # Longest page URL and length
+    longest_page_url, longest_page_length = max(page_lengths.items(), key=lambda x: x[1], default=("None", 0))
+
+    # 50 most common words
+    common_words = word_counter.most_common(50)
+
+    # Write report
+    with open("analytics_report.txt", "w") as f:
+        f.write("Analytics Report\n")
+        f.write("================\n\n")
+        
+        # Unique pages
+        f.write(f"Total unique pages: {len(unique_pages)}\n\n")
+        
+        # Longest page
+        f.write(f"Longest page: {longest_page_url}\n")
+        f.write(f"Word count: {longest_page_length}\n\n")
+        
+        # Most common words
+        f.write("50 Most Common Words (excluding stop words):\n")
+        for word, count in common_words:
+            f.write(f"{word}: {count}\n")
+        f.write("\n")
+
+        # Subdomains
+        f.write("Subdomains and Unique Pages Count:\n")
+        for domain, count in sorted(subdomains.items()):
+            f.write(f"{domain}, {count}\n")
+
+# Call this function at the end of the crawl to generate the report
+generate_report()
