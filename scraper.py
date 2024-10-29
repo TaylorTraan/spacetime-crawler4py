@@ -27,7 +27,6 @@ def extract_next_links(url, resp):
     global unique_pages
     hyperLinks = []  # Store extracted hyperlinks.
     
-
     try:
         # Access the status safely.
         status = getattr(resp, 'status', None) or getattr(resp.raw_response, 'status', None)
@@ -54,8 +53,6 @@ def extract_next_links(url, resp):
             for anchor in aTags:
                 relativeLink = anchor['href']
                 fullLink = urljoin(url, relativeLink)  # Combine base URL with the found link.
-
-                # Check for duplicate URLs and traps.
                 print(f"Found link: {fullLink}")
                 hyperLinks.append(fullLink)
                 visited_urls.add(fullLink)  # Mark as visited.
@@ -118,7 +115,6 @@ def is_valid(url):
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", 
             parsed.path.lower()):
             return False
-
 
         return True
 
