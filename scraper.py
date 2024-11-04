@@ -1,76 +1,56 @@
 import re
-from urllib.parse import urlparse, urljoin, parse_qs, urlunparse
+from urllib.parse import urlparse, urljoin, parse_qs, urldefrag
+from url_normalize import url_normalize
 from bs4 import BeautifulSoup
 import lxml
-from collections import Counter, defaultdict
 
-# A global set to track visited URLs and avoid duplicates.
-#visited_urls = set()
 
-# Data structures for analytics
-unique_pages = set()  # Tracks unique pages based on URL (excluding fragments)
-page_lengths = {}     # Tracks page lengths {url: word_count}
-word_counter = Counter()  # Counts words across all pages
-subdomains = defaultdict(int)  # Counts unique pages per subdomain
 
-# Load English stop words
-with open("stop_words.txt") as f:
-    stop_words = set(f.read().split())
-    
-def defragmentize(url):
-    parsed = urlparse(url)
-    # Remove fragment and rebuild the URL without it
-    return urlunparse(parsed._replace(fragment=''))
 
-def scraper(url, resp):
+def scraper(url, resp, visitedURLs, subdomains):
     """Scrapes the URL and returns a list of valid links."""
-    links = extract_next_links(url, resp)
-    return [defragmentize(link) for link in links if is_valid(defragmentize(link))]
+    try:
+        if resp.status != 200:
+            return []
+        if resp.raw_response is None:
+            return []
+        if resp.raw_response.content is None:
+            return []
+        if not resp:
+            return []
+        
+        visitedURLs.add(url)
+        getSubdomains(url, subdomains)
+        
+        if resp.status == 200:
+            links = extract_next_links(url, resp)
+            return [link for link in links if is_valid(link, visitedURLs)]
+        else:
+            return []
+    except Exception as e:
+        print(f"error at {url}")
+        return []
 
 def extract_next_links(url, resp):
     """Extracts hyperlinks from a given URL's response content."""
-    global unique_pages
     hyperLinks = []  # Store extracted hyperlinks.
     
     try:
-        # Access the status safely.
-        status = getattr(resp, 'status', None) or getattr(resp.raw_response, 'status', None)
 
-        if status == 200 and resp and resp.raw_response:  # If the request is successful.
+        if  resp and resp.status == 200 and resp.raw_response:  # If the request is successful.
             soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-            aTags = soup.findAll('a', href=True) # Find all anchor tags with href attributes.
-            
-            text = soup.get_text()
-            words = re.findall(r'\b\w+\b', text.lower())
-            words = [word for word in words if word not in stop_words]
-            
-            # Check if the page meets the minimum word count threshold
-            if len(words) < 100:  # Example threshold
-                print(f"Skipping low-content page: {url} (word count: {len(words)})")
-                return hyperLinks  # Return empty list since we don't process this page further
-
-            # Update page length
-            page_lengths[url] = len(words)
-
-            # Update word counter
-            word_counter.update(words)
-
-            # Track subdomains
-            domain = urlparse(url).netloc
-            if domain.endswith('.uci.edu'):
-                subdomains[domain] += 1
+            foundLinks = soup.findAll('a', href=True) # Find all anchor tags with href attributes.
             
             print(f"starting to crawl at {resp.url}")
-            for anchor in aTags:  
-                relativeLink = anchor['href']
+            for link in foundLinks:  
+                relativeLink = link['href']
                 fullLink = urljoin(url, relativeLink)  # Combine base URL with the found link.
-                defragmentedLink = defragmentize(fullLink)
-                hyperLinks.append(defragmentedLink)
-                #visited_urls.add(defragmentedLink)  # Mark as visited.
                 
-            unique_pages.add(defragmentize(url))
+                defragmentedLink = urldefrag(fullLink)[0]
+                
+                hyperLinks.append(defragmentedLink)
         else:
-            print(f"Error: Unable to fetch page. Status: {status}")
+            print(f"Error: Unable to fetch page. Status: {resp.status}")
             if hasattr(resp, 'error') and resp.error:
                 print(f"Error details: {resp.error}")
     except AttributeError as e:
@@ -78,42 +58,49 @@ def extract_next_links(url, resp):
     except Exception as e:
         print(f"Unexpected error occurred: {e}")
 
-    # print(f"Unique Pages: {unique_pages}")
-    # print(f"Page Lengths: {page_lengths}")
-    # print(f"Word Counter: {word_counter}")
-    # print(f"Unique pages per subdomain: {subdomains}")
     return hyperLinks
 
-def is_valid(url):
+def getSubdomains(url, subdomains):
+    parsedUrl = urlparse(url)
+    
+    domain = parsedUrl.hostname
+
+    #if domain is not none and domain is in allowed domains
+    if domain and domain.endswith(".ics.uci.edu"):
+        defragPath = urldefrag(url)[0]
+        if domain in subdomains:
+            subdomains[domain].add(defragPath)
+        else:
+            subdomains[domain] = {defragPath}
+
+def is_valid(url, visitedUrl):
     """Checks if the URL should be crawled or not, avoiding traps."""
     try:
-        parsed = urlparse(url)
+        
+        if url in visitedUrl:
+            return False
+        parsed = urlparse(url_normalize(url))
 
         # Check the scheme.
         if parsed.scheme not in {"http", "https"}:
             return False
-
-        # Avoid revisiting the same URL.
-        # if url in visited_urls:
-        #     return False
-
-        # Avoid URLs with query parameters that look like calendars or session IDs.
-        query_params = parse_qs(parsed.query)
-        if any(re.match(r'\d{4}-\d{2}-\d{2}', param) for param in query_params):
-            print(f"Skipping potential calendar trap: {url}")
+        
+        #Checks if it has hostname
+        if parsed.hostname is None:
+            return False
+        
+        # Check if the path is blacklisted
+        blackListedPaths = [
+            '/~eppstein/pix/',
+            '/ml/datasets.php',
+            "ml/machine-learning-databases/tic-mld/ticeval2000.txt"
+        ]
+        if (parsed.path.startswith(blackListedPaths[0]) and parsed.path != blackListedPaths[0]) or parsed.path in blackListedPaths:
             return False
 
-        # Allowed domains for crawling.
-        allowedDomains = {
-            ".ics.uci.edu",
-            ".cs.uci.edu",
-            ".informatics.uci.edu",
-            ".stat.uci.edu",
-            "today.uci.edu/department/information_computer_sciences",
-        }
-
-        # Check if the domain is in the allowed list.
-        if not any(domain in parsed.netloc for domain in allowedDomains):
+        #if current domain doesn't exist in listed domains; false
+        allowedDomains = r"(.*\.ics\.uci\.edu|.*\.cs\.uci\.edu|.*\.informatics\.uci\.edu|.*\.stat\.uci\.edu)"
+        if not re.match(allowedDomains, parsed.hostname):
             return False
 
         # Avoid non-HTML content.
@@ -129,7 +116,7 @@ def is_valid(url):
             parsed.path.lower()):
             return False
         
-        if len(url) > 200:
+        if len(url) > 200 or len(parsed.path.split('/')) > 20:
             print(f"Skipping overly long URL: {url}")
             return False
 
@@ -138,25 +125,3 @@ def is_valid(url):
     except TypeError as e:
         print(f"TypeError for {url}: {e}")
         return False
-    
-def generate_report():
-    """Generates a report with analytics and saves it to a text file."""
-    longest_page_url, longest_page_length = max(page_lengths.items(), key=lambda x: x[1], default=("None", 0))
-    common_words = word_counter.most_common(50)
-
-    try:
-        with open("analytics_report.txt", "w") as f:
-            f.write("Analytics Report\n")
-            f.write("================\n\n")
-            f.write(f"Total unique pages: {len(unique_pages)}\n\n")
-            f.write(f"Longest page: {longest_page_url}\n")
-            f.write(f"Word count: {longest_page_length}\n\n")
-            f.write("50 Most Common Words (excluding stop words):\n")
-            for word, count in common_words:
-                f.write(f"{word}: {count}\n")
-            f.write("\n")
-            f.write("Subdomains and Unique Pages Count:\n")
-            for domain, count in sorted(subdomains.items()):
-                f.write(f"{domain}, {count}\n")
-    except IOError as e:
-        print(f"Error writing report: {e}")

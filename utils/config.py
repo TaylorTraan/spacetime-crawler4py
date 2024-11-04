@@ -15,5 +15,7 @@ class Config(object):
 
         self.seed_urls = config["CRAWLER"]["SEEDURL"].split(",")
         self.time_delay = float(config["CRAWLER"]["POLITENESS"])
+        
+        self.simhashThreshold = int(config["CRAWLER"]["SIMHASH_THRESHOLD"])
 
         self.cache_server = None
