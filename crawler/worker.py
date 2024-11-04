@@ -100,7 +100,7 @@ class Worker(Thread):
 
                 # Number of subdomains and their counts
                 file.write(f'Number of subdomains: {len(self.frontier.subdomains)}\n')
-                for subdomain, urlSet in self.frontier.subdomains.items():
+                for subdomain, urlSet in sorted(self.frontier.subdomains.items()):
                     file.write(f'{subdomain}: {len(urlSet)}\n')
 
         except IOError as e:
