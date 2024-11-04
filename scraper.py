@@ -63,7 +63,7 @@ def getSubdomains(url, subdomains):
     domain = parsedUrl.hostname
 
     #if domain is not none and domain is in allowed domains
-    if domain and domain.endswith(".ics.uci.edu"):
+    if domain and domain.endswith(".uci.edu"):
         defragPath = urldefrag(url)[0]
         if domain in subdomains:
             subdomains[domain].add(defragPath)

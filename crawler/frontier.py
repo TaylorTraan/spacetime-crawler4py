@@ -17,11 +17,12 @@ class Frontier(object):
         self.to_be_downloaded = list()
         
         self.visitedURLs = set()
-        self.uniquePages = set()  # Tracks unique pages based on URL (excluding fragments)
         
+        self.uniquePages = set()  # Tracks unique pages based on URL (excluding fragments)
         self.wordCounter = Counter()  # Counts words across all pages
         self.highestWordCount = ("", 0) # Variable that holds url with the highest wordcount
         self.subdomains = {} #key = subdomain, value = set of urls in subdomain
+        
         self.simhashes = set()
         
         self.stopWords = [  "a", "about", "above", "after", "again", "against", "all", "am", "an", "and",
@@ -78,6 +79,7 @@ class Frontier(object):
             text = soup.get_text().lower()
             words = re.findall(pattern, text)
             counter = Counter(words)
+            
             self.wordCounter += counter
 
             if len(words) > self.highestWordCount[1]:
