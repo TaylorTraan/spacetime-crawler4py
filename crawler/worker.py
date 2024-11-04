@@ -26,11 +26,11 @@ class Worker(Thread):
         assert {getsource(scraper).find(req) for req in {"from requests import", "import requests"}} == {-1}, "Do not use requests in scraper.py"
         assert {getsource(scraper).find(req) for req in {"from urllib.request import", "import urllib.request"}} == {-1}, "Do not use urllib.request in scraper.py"
     
-    #Hamming Distance(difference between simhash values): lower distance = more similar simhash values
+    # Hamming Distance(difference between simhash values): lower distance = more similar simhash values
     def getDistance(self, currSimhash, existingSimhash):
         return bin(currSimhash ^ existingSimhash).count('1')
     
-    #
+    # Considers if simhash of current url is duplicate by comparing it with the other calculated simhash values.
     def isDuplicate(self, simhash):
         for existingSimhash in self.frontier.simhashes:
             if self.getDistance(simhash, existingSimhash) < self.simhashThreshold:

@@ -20,7 +20,7 @@ class Frontier(object):
         self.uniquePages = set()  # Tracks unique pages based on URL (excluding fragments)
         
         self.wordCounter = Counter()  # Counts words across all pages
-        self.highestWordCount = ("", 0)
+        self.highestWordCount = ("", 0) # Variable that holds url with the highest wordcount
         self.subdomains = defaultdict(int)  # Counts unique pages per subdomain
         self.simhashes = set()
         
@@ -66,9 +66,12 @@ class Frontier(object):
                 for url in self.config.seed_urls:
                     self.add_url(url)
     
+    # wordCount function counts words for a given webpage
     def wordCount(self, url, resp):
         try:
+            # Parse the webpage content using BeautifulSoup
             soup = BeautifulSoup(resp.raw_response.content, "lxml")
+
             pattern = r"\b(?:\w+(?:'\w+|\u2019\w+)|\w+)\b"
             text = soup.get_text().lower()
             words = re.findall(pattern, text)

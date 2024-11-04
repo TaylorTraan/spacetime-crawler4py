@@ -4,9 +4,6 @@ from url_normalize import url_normalize
 from bs4 import BeautifulSoup
 import lxml
 
-
-
-
 def scraper(url, resp, visitedURLs, subdomains):
     """Scrapes the URL and returns a list of valid links."""
     try:
@@ -76,7 +73,6 @@ def getSubdomains(url, subdomains):
 def is_valid(url, visitedUrl):
     """Checks if the URL should be crawled or not, avoiding traps."""
     try:
-        
         if url in visitedUrl:
             return False
         parsed = urlparse(url_normalize(url))
