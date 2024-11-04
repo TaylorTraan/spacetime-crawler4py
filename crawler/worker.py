@@ -100,8 +100,8 @@ class Worker(Thread):
 
                 # Number of subdomains and their counts
                 file.write(f'Number of subdomains: {len(self.frontier.subdomains)}\n')
-                for subdomain, count in self.frontier.subdomains.items():
-                    file.write(f'{subdomain}: {count}\n')
+                for subdomain, urlSet in self.frontier.subdomains.items():
+                    file.write(f'{subdomain}: {len(urlSet)}\n')
 
         except IOError as e:
             self.logger.info(f"Error writing report: {e}")

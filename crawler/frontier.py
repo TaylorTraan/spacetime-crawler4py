@@ -21,7 +21,7 @@ class Frontier(object):
         
         self.wordCounter = Counter()  # Counts words across all pages
         self.highestWordCount = ("", 0) # Variable that holds url with the highest wordcount
-        self.subdomains = defaultdict(int)  # Counts unique pages per subdomain
+        self.subdomains = {} #key = subdomain, value = set of urls in subdomain
         self.simhashes = set()
         
         self.stopWords = [  "a", "about", "above", "after", "again", "against", "all", "am", "an", "and",
@@ -41,7 +41,9 @@ class Frontier(object):
                             "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were",
                             "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while",
                             "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you",
-                            "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"
+                            "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves",
+                            "b", "c", "d", "e", "f", "g", "h", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s",
+                            "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
                         ] 
         
         if not os.path.exists(self.config.save_file) and not restart:
